@@ -124,16 +124,14 @@ class MainWindow(QMainWindow):
         if not self._file_path:
             return
 
-        self.text_edit.clear()
-        self.progress_bar.setValue(0)
+        self.text_edit.setPlainText("文字起こし中...(モデルによっては数分かかることがあります)")
+        self.progress_bar.setRange(0, 0)
         self.start_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self.save_button.setEnabled(False)
         self.copy_button.setEnabled(False)
 
         self._worker = TranscribeWorker(self._file_path, self.model_combo.currentText())
-        self._worker.segment_ready.connect(self._append_segment)
-        self._worker.progress_changed.connect(self._update_progress)
         self._worker.finished_ok.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._worker.start()
@@ -143,19 +141,18 @@ class MainWindow(QMainWindow):
             self._worker.cancel()
         self.cancel_button.setEnabled(False)
 
-    def _append_segment(self, text: str):
-        self.text_edit.insertPlainText(text)
-
-    def _update_progress(self, fraction: float):
-        self.progress_bar.setValue(int(fraction * 100))
-
     def _on_finished(self, full_text: str):
+        self.text_edit.setPlainText(full_text)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100)
         self.start_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
         self.save_button.setEnabled(True)
         self.copy_button.setEnabled(True)
 
     def _on_error(self, message: str):
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
         self.start_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
         QMessageBox.critical(self, "エラー", message)
