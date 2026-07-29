@@ -1,30 +1,15 @@
-from typing import Iterator
-
-
-class TranscriptionResult:
-    def __init__(self, text: str, start: float, end: float):
-        self.text = text
-        self.start = start
-        self.end = end
+import mlx_whisper
 
 
 class TranscriptionEngine:
-    def __init__(self, model):
-        self._model = model
+    def __init__(self, repo_id: str, transcribe_fn=mlx_whisper.transcribe):
+        self._repo_id = repo_id
+        self._transcribe_fn = transcribe_fn
 
-    def transcribe(self, file_path: str) -> tuple[Iterator[TranscriptionResult], float]:
-        segments, info = self._model.transcribe(
+    def transcribe(self, file_path: str) -> str:
+        result = self._transcribe_fn(
             file_path,
+            path_or_hf_repo=self._repo_id,
             language="ja",
-            vad_filter=True,
         )
-
-        def result_iter():
-            for segment in segments:
-                yield TranscriptionResult(
-                    text=segment.text,
-                    start=segment.start,
-                    end=segment.end,
-                )
-
-        return result_iter(), info.duration
+        return result["text"]
