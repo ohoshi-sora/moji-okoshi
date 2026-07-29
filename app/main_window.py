@@ -60,6 +60,9 @@ class MainWindow(QMainWindow):
 
         self.cancel_button = QPushButton("キャンセル")
         self.cancel_button.setEnabled(False)
+        self.cancel_button.setToolTip(
+            "実行中の計算は止められません。完了時の結果表示のみ取り消します。"
+        )
         self.cancel_button.clicked.connect(self._cancel_transcription)
         button_row.addWidget(self.cancel_button)
         layout.addLayout(button_row)
