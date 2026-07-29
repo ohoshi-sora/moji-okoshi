@@ -1,2 +1,2 @@
-faster-whisper
+mlx-whisper
 PySide6

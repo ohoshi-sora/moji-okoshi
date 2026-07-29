@@ -1,26 +1,18 @@
 import pytest
 
-from app.model_loader import load_model, DEFAULT_MODEL_SIZE, MODEL_SIZES
-
-
-class FakeModelCls:
-    def __init__(self, model_size, device, compute_type):
-        self.model_size = model_size
-        self.device = device
-        self.compute_type = compute_type
+from app.model_loader import resolve_repo_id, DEFAULT_MODEL_SIZE, MODEL_SIZES
 
 
 def test_model_sizes_contains_default():
     assert DEFAULT_MODEL_SIZE in MODEL_SIZES
 
 
-def test_load_model_uses_cpu_and_int8():
-    model = load_model(DEFAULT_MODEL_SIZE, model_cls=FakeModelCls)
-    assert model.model_size == "medium"
-    assert model.device == "cpu"
-    assert model.compute_type == "int8"
+def test_resolve_repo_id_for_each_model_size():
+    assert resolve_repo_id("small") == "mlx-community/whisper-small-mlx"
+    assert resolve_repo_id("medium") == "mlx-community/whisper-medium-mlx"
+    assert resolve_repo_id("large-v3-turbo") == "mlx-community/whisper-large-v3-turbo"
 
 
-def test_load_model_rejects_unknown_size():
+def test_resolve_repo_id_rejects_unknown_size():
     with pytest.raises(ValueError):
-        load_model("tiny-unsupported", model_cls=FakeModelCls)
+        resolve_repo_id("tiny-unsupported")
