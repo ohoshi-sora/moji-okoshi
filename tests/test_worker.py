@@ -1,54 +1,43 @@
 from app.worker import TranscribeWorker
 
 
-class FakeSegment:
-    def __init__(self, text, start, end):
-        self.text = text
-        self.start = start
-        self.end = end
-
-
 class FakeEngine:
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, repo_id):
+        self.repo_id = repo_id
 
     def transcribe(self, file_path):
-        segments = [
-            FakeSegment("こんにちは", 0.0, 1.0),
-            FakeSegment("さようなら", 1.0, 2.0),
-        ]
-        return iter(segments), 2.0
+        return "こんにちはさようなら"
 
 
-def fake_model_loader(model_size):
-    return object()
+def fake_repo_resolver(model_size):
+    return "mlx-community/whisper-medium-mlx"
 
 
-def test_worker_emits_segments_and_final_text(qtbot):
+def test_worker_emits_finished_with_full_text(qtbot):
     worker = TranscribeWorker(
         "/tmp/meeting.mp4",
         "medium",
-        model_loader=fake_model_loader,
+        repo_resolver=fake_repo_resolver,
         engine_cls=FakeEngine,
     )
 
-    segments = []
-    worker.segment_ready.connect(segments.append)
     finished = []
     worker.finished_ok.connect(finished.append)
 
     worker.run()
 
-    assert segments == ["こんにちは", "さようなら"]
     assert finished == ["こんにちはさようなら"]
 
 
 def test_worker_emits_error_on_exception(qtbot):
-    def broken_loader(model_size):
+    def broken_engine_cls(repo_id):
         raise RuntimeError("model load failed")
 
     worker = TranscribeWorker(
-        "/tmp/meeting.mp4", "medium", model_loader=broken_loader, engine_cls=FakeEngine
+        "/tmp/meeting.mp4",
+        "medium",
+        repo_resolver=fake_repo_resolver,
+        engine_cls=broken_engine_cls,
     )
 
     errors = []
@@ -59,9 +48,12 @@ def test_worker_emits_error_on_exception(qtbot):
     assert errors == ["model load failed"]
 
 
-def test_worker_cancel_stops_before_finished(qtbot):
+def test_worker_cancel_suppresses_finished_signal(qtbot):
     worker = TranscribeWorker(
-        "/tmp/meeting.mp4", "medium", model_loader=fake_model_loader, engine_cls=FakeEngine
+        "/tmp/meeting.mp4",
+        "medium",
+        repo_resolver=fake_repo_resolver,
+        engine_cls=FakeEngine,
     )
     worker.cancel()
 
