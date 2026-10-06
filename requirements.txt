@@ -3,6 +3,8 @@ PySide6
 # Apple Silicon の Mac は mlx-whisper、それ以外(Windows / Intel Mac)は faster-whisper
 mlx-whisper; sys_platform == "darwin" and platform_machine == "arm64"
 faster-whisper>=1.1.0; sys_platform != "darwin" or platform_machine != "arm64"
+# av 19 で av.open() の metadata_errors 引数が削除され、faster-whisper が動かなくなる
+av<19; sys_platform != "darwin" or platform_machine != "arm64"
 
 # Windows の NVIDIA GPU(CUDA 12)で faster-whisper を動かすためのライブラリ
 nvidia-cublas-cu12==12.*; sys_platform == "win32"

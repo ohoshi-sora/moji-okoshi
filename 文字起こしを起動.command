@@ -12,14 +12,15 @@ fi
 
 source venv/bin/activate
 
-if [ ! -f venv/.deps-installed ]; then
+# requirements.txt が前回インストール時から変わっていたら入れ直す
+if ! cmp -s requirements.txt venv/.requirements-installed; then
     echo "初回セットアップ: 依存ライブラリをインストールします(数分かかります)"
     if ! pip install -r requirements.txt; then
         echo "インストールに失敗しました。上のエラーを確認してください。"
         read -n 1 -s -r -p "何かキーを押すと閉じます"
         exit 1
     fi
-    touch venv/.deps-installed
+    cp requirements.txt venv/.requirements-installed
 fi
 
 python main.py || read -n 1 -s -r -p "異常終了しました。何かキーを押すと閉じます"

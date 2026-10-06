@@ -13,15 +13,17 @@ if not exist venv\Scripts\activate.bat (
 
 call venv\Scripts\activate.bat
 
-if not exist venv\.deps-installed (
-    echo First-time setup: installing dependencies. This takes a few minutes...
+rem Reinstall when requirements.txt changed since the last install
+fc /b requirements.txt venv\.requirements-installed >nul 2>&1
+if errorlevel 1 (
+    echo Setup: installing dependencies. This takes a few minutes...
     python -m pip install -r requirements.txt
     if errorlevel 1 (
         echo Installation failed. Please check the error above.
         pause
         exit /b 1
     )
-    type nul > venv\.deps-installed
+    copy /y requirements.txt venv\.requirements-installed >nul
 )
 
 python main.py
