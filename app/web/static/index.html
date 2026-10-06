@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文字起こし</title>
+<style>
+  :root { --bg:#f6f7f9; --fg:#1d2733; --muted:#667085; --card:#fff; --line:#d9dee5; --accent:#2563eb; --ok:#15803d; --err:#b91c1c; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171c; --fg:#e6e9ee; --muted:#9aa4b2; --card:#1d222a; --line:#323a45; --accent:#6b9bff; --ok:#4ade80; --err:#f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, "Hiragino Sans", "Yu Gothic UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.4rem; margin: 0 0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  #drop { border:2px dashed var(--line); border-radius:10px; padding:28px 12px; text-align:center; color:var(--muted); cursor:pointer; }
+  #drop.over { border-color:var(--accent); color:var(--accent); }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+  select, button { font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--fg); }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  .job-head { display:flex; justify-content:space-between; gap:8px; align-items:baseline; flex-wrap:wrap; }
+  .name { font-weight:600; word-break:break-all; }
+  .status { font-size:.9rem; color:var(--muted); }
+  .status.done { color:var(--ok); }
+  .status.error { color:var(--err); }
+  textarea { width:100%; min-height:160px; margin-top:8px; padding:8px; font:inherit; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); resize:vertical; }
+  .note { color:var(--muted); font-size:.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>文字起こし</h1>
+
+  <div class="card">
+    <div id="drop">ここにファイルをドラッグ&amp;ドロップ、またはクリックして選択<br>
+      <span class="note">対応形式: .mov .mp4 .m4a .wav .mp3</span></div>
+    <input id="file" type="file" accept=".mov,.mp4,.m4a,.wav,.mp3" multiple hidden>
+    <div class="row">
+      <label for="model">モデルサイズ:</label>
+      <select id="model">
+        <option value="small">small</option>
+        <option value="medium" selected>medium</option>
+        <option value="large-v3-turbo">large-v3-turbo</option>
+      </select>
+    </div>
+    <p id="message" class="note" role="status"></p>
+  </div>
+
+  <div id="jobs"></div>
+</main>
+
+<script>
+const STATUS_LABEL = { queued: "待機中", processing: "処理中…", done: "完了", error: "エラー" };
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("file");
+const message = document.getElementById("message");
+const jobsEl = document.getElementById("jobs");
+const cards = new Map();
+
+drop.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => { upload(fileInput.files); fileInput.value = ""; });
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); upload(e.dataTransfer.files); });
+
+async function upload(files) {
+  const model = document.getElementById("model").value;
+  for (const file of files) {
+    message.textContent = `${file.name} をアップロード中…`;
+    const body = new FormData();
+    body.append("file", file);
+    body.append("model_size", model);
+    try {
+      const res = await fetch("/api/jobs", { method: "POST", body });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        message.textContent = `${file.name}: ${err.detail || "アップロードに失敗しました"}`;
+        continue;
+      }
+      message.textContent = "";
+    } catch (e) {
+      message.textContent = `${file.name}: 通信に失敗しました`;
+    }
+  }
+  refresh();
+}
+
+function render(job) {
+  let card = cards.get(job.id);
+  if (!card) {
+    card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `<div class="job-head"><span class="name"></span><span class="status"></span></div>
+      <div class="result" hidden><textarea readonly></textarea>
+      <div class="row"><button class="copy">コピー</button><button class="save">テキストを保存</button></div></div>
+      <p class="error note" hidden></p>`;
+    card.querySelector(".name").textContent = `${job.filename} (${job.model_size})`;
+    card.querySelector(".copy").onclick = () => navigator.clipboard.writeText(card.querySelector("textarea").value);
+    card.querySelector(".save").onclick = () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([card.querySelector("textarea").value], { type: "text/plain;charset=utf-8" }));
+      a.download = job.filename.replace(/\.[^.]+$/, "") + ".txt";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    jobsEl.prepend(card);
+    cards.set(job.id, card);
+  }
+  const status = card.querySelector(".status");
+  status.textContent = STATUS_LABEL[job.status] || job.status;
+  status.className = "status " + job.status;
+  if (job.status === "done") {
+    card.querySelector(".result").hidden = false;
+    card.querySelector("textarea").value = job.text;
+  }
+  if (job.status === "error") {
+    const err = card.querySelector(".error");
+    err.hidden = false;
+    err.textContent = job.error;
+  }
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/jobs");
+    if (res.ok) (await res.json()).forEach(render);
+  } catch (e) { /* 次の周期で再試行 */ }
+}
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
