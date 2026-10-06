@@ -1,6 +1,6 @@
 from pathlib import Path
 
-SUPPORTED_EXTENSIONS = {".mov", ".mp4", ".m4a", ".wav", ".mp3"}
+SUPPORTED_EXTENSIONS = {".mov", ".mp4", ".m4a", ".wav", ".mp3", ".qta"}
 
 
 def is_supported_file(path: str) -> bool:
