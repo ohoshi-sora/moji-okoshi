@@ -105,5 +105,32 @@ def test_list_jobs_returns_jobs_in_submission_order(tmp_path):
     assert queue.list_jobs() == [first, second]
 
 
+def test_clear_finished_removes_done_and_error_jobs_only(tmp_path):
+    def flaky_engine_cls(repo_id):
+        flaky_engine_cls.calls += 1
+        if flaky_engine_cls.calls == 2:
+            raise RuntimeError("boom")
+        return FakeEngine(repo_id)
+
+    flaky_engine_cls.calls = 0
+    queue = make_queue(engine_cls=flaky_engine_cls)
+    done = queue.submit(make_audio(tmp_path, "a.wav"), "a.wav", "medium")
+    failed = queue.submit(make_audio(tmp_path, "b.wav"), "b.wav", "medium")
+    waiting = queue.submit(make_audio(tmp_path, "c.wav"), "c.wav", "medium")
+    queue.process_one()
+    queue.process_one()
+
+    removed = queue.clear_finished()
+
+    assert removed == 2
+    assert queue.list_jobs() == [waiting]
+    assert queue.get(done.id) is None
+    assert queue.get(failed.id) is None
+
+
+def test_clear_finished_with_no_jobs_returns_zero():
+    assert make_queue().clear_finished() == 0
+
+
 def test_get_unknown_job_returns_none():
     assert make_queue().get("missing") is None

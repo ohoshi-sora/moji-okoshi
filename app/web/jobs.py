@@ -51,6 +51,18 @@ class JobQueue:
         with self._lock:
             return list(self._jobs.values())
 
+    def clear_finished(self) -> int:
+        """完了・エラーのジョブを履歴から消す。待機中・処理中は残す。"""
+        with self._lock:
+            finished_ids = [
+                job_id
+                for job_id, job in self._jobs.items()
+                if job.status in ("done", "error")
+            ]
+            for job_id in finished_ids:
+                del self._jobs[job_id]
+        return len(finished_ids)
+
     def process_one(self):
         job = self._pending.get()
         job.status = "processing"

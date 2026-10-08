@@ -10,6 +10,7 @@
     :root { --bg:#14171c; --fg:#e6e9ee; --muted:#9aa4b2; --card:#1d222a; --line:#323a45; --accent:#6b9bff; --ok:#4ade80; --err:#f87171; }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, "Hiragino Sans", "Yu Gothic UI", sans-serif; }
   main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
   h1 { font-size: 1.4rem; margin: 0 0 16px; }
@@ -46,6 +47,11 @@
       </select>
     </div>
     <p id="message" class="note" role="status"></p>
+  </div>
+
+  <div class="row" id="history-bar" hidden>
+    <button id="clear">履歴をクリア</button>
+    <span class="note">完了・エラーの結果を消します(処理中・待機中は残ります)</span>
   </div>
 
   <div id="jobs"></div>
@@ -125,9 +131,26 @@ function render(job) {
 async function refresh() {
   try {
     const res = await fetch("/api/jobs");
-    if (res.ok) (await res.json()).forEach(render);
+    if (!res.ok) return;
+    const jobs = await res.json();
+    jobs.forEach(render);
+    const alive = new Set(jobs.map(job => job.id));
+    for (const [id, card] of cards) {
+      if (!alive.has(id)) { card.remove(); cards.delete(id); }
+    }
+    document.getElementById("history-bar").hidden = jobs.length === 0;
   } catch (e) { /* 次の周期で再試行 */ }
 }
+
+document.getElementById("clear").addEventListener("click", async () => {
+  if (!confirm("完了・エラーの履歴を消します。よろしいですか?")) return;
+  try {
+    await fetch("/api/jobs", { method: "DELETE" });
+  } catch (e) {
+    message.textContent = "通信に失敗しました";
+  }
+  refresh();
+});
 refresh();
 setInterval(refresh, 2000);
 </script>

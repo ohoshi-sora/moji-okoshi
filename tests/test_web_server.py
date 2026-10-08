@@ -109,6 +109,31 @@ def test_list_jobs_returns_all_jobs(tmp_path):
     assert [job["filename"] for job in response.json()] == ["a.wav", "b.wav"]
 
 
+def test_delete_jobs_clears_finished_jobs_and_keeps_waiting_ones(tmp_path):
+    client, queue = make_client(tmp_path)
+    finished_id = upload(client, name="a.wav").json()["id"]
+    waiting_id = upload(client, name="b.wav").json()["id"]
+    queue.process_one()
+
+    response = client.delete("/api/jobs")
+
+    assert response.status_code == 200
+    assert response.json() == {"removed": 1}
+    assert client.get(f"/api/jobs/{finished_id}").status_code == 404
+    assert client.get(f"/api/jobs/{waiting_id}").status_code == 200
+
+
+def test_delete_jobs_requires_password(tmp_path):
+    client, queue = make_client(tmp_path, password="secret")
+    upload(client, headers=basic_auth("secret"))
+    queue.process_one()
+
+    assert client.delete("/api/jobs").status_code == 401
+    assert len(queue.list_jobs()) == 1
+    assert client.delete("/api/jobs", headers=basic_auth("secret")).status_code == 200
+    assert queue.list_jobs() == []
+
+
 def test_unknown_job_returns_404(tmp_path):
     client, _ = make_client(tmp_path)
 

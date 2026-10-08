@@ -62,6 +62,10 @@ def create_app(job_queue: JobQueue, upload_dir, password: str | None = None) -> 
     def list_jobs():
         return [_job_to_dict(job) for job in job_queue.list_jobs()]
 
+    @app.delete("/api/jobs", dependencies=protected)
+    def clear_finished_jobs():
+        return {"removed": job_queue.clear_finished()}
+
     @app.get("/api/jobs/{job_id}", dependencies=protected)
     def get_job(job_id: str):
         job = job_queue.get(job_id)
